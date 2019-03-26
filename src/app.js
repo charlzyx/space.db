@@ -1,139 +1,102 @@
-import React, { useState, useEffect, PureComponent } from 'react';
-import { atom } from './atom.io';
+import React, { PureComponent, useState, useEffect } from 'react';
+import { Space, Atomic } from './space';
 
-// event to value a
-const eva = e => e.target.value;
+const Input = Atomic((props) => {
+  const onChange = (e) => {
+    props.onChange(e.target.value);
+  };
+  return <input type="text" {...props} onChange={onChange} />;
+});
+const Show = Atomic(props => props.value || '');
 
-const [got, put, Atomic] = atom();
 
-const UseApp = () => {
-  const [state, setState] = useState({
-    query: {
-      name: '',
-      age: '',
-    },
-  });
-  useEffect(() => {
-    console.log('effect', state);
-  });
-  return (
-    <Atomic ctx={{ state, setState }}>
-      <div>
-        <h1>Hello, Atomic</h1>
-        <input
-          vm="query.name"
-          onChange={eva}
-          type="text"
-        />
-        <input
-          onChange={eva}
-          vm="query.age"
-          type="text"
-        />
-
-        <button
-          onClick={() => {
-            console.log('log got', got());
-            got.next().then((next) => {
-              console.log('log got.next', next);
-            });
-          }}
-          type="button"
-        >
-            log
-        </button>
-        <button
-          onClick={() => {
-            put((data) => {
-                data.query.age++; // eslint-disable-line
-            }).then((next) => {
-              console.log('put next', next);
-            });
-            console.log('now dealy got', got());
-            console.log('now dealy state', state);
-            got.next().then((next) => {
-              console.log('got next', next);
-            });
-            setTimeout(() => {
-              console.log('delay state', state);
-              console.log('delay got', got());
-            });
-          }}
-          type="button"
-        >
-            put test
-        </button>
-      </div>
-    </Atomic>
-  );
+const db = {
+  value: { name: '2333' },
+  onChange: (next) => {
+    db.value = next;
+  },
 };
 
+
 class App extends PureComponent {
-  state = {
-    query: {
-      name: '',
-      age: '',
-    },
-  };
+  // state = {
+  //   name: '',
+  // };
+
+  onChange=(val) => {
+    console.log('onChange', val);
+  }
+
+  onClick = (e) => {
+    // window.get = () => this.state;
+    this.setState({ name: +new Date() });
+    // db.onChange({ name: +new Date() });
+  }
+
+  // diff = (nextState) => {
+  //   console.log('next', nextState, this.state);
+  //   if (nextState !== this.state) {
+  //     console.log('next update');
+  //     this.setState(nextState);
+  //   }
+  // }
+
+  onEffect = (v) => {
+    console.log('onEffect', v);
+  }
 
   render() {
-    console.log('render', this.state);
     return (
-      <Atomic ctx={this}>
-        <div>
-          <h1>Hello, Atomic</h1>
-          <input
-            vm="query.name"
-            onChange={eva}
-            type="text"
-          />
-          <input
-            onChange={eva}
-            vm="query.age"
-            type="text"
-          />
-
-          <button
-            onClick={() => {
-              console.log('log got', got());
-              got.next().then((next) => {
-                console.log('log got.next', next);
-              });
-            }}
-            type="button"
-          >
-            log
-          </button>
-          <button
-            onClick={() => {
-              put((state) => {
-                state.query.age++; // eslint-disable-line
-              }).then((next) => {
-                console.log('put next', next);
-              });
-              console.log('now dealy got', got());
-              console.log('now dealy state', this.state);
-              got.next().then((next) => {
-                console.log('got next', next);
-              });
-              setTimeout(() => {
-                console.log('delay state', this.state);
-                console.log('delay got', got());
-              });
-            }}
-            type="button"
-          >
-            put test
-          </button>
-        </div>
-      </Atomic>
+      <div>
+        <Space with={this} effect={this.onEffect}>
+          <div>
+            <Input vm="name" onChange={this.onChange} />
+          </div>
+          <div>
+            <Show vm="name" />
+          </div>
+        </Space>
+        <button type="button" onClick={this.onClick}>clickme</button>
+      </div>
     );
   }
 }
 
-export default () => (
-  <div>
-    <App />
-    <UseApp />
-  </div>
-);
+// const HooksApp = (props) => {
+//   const [state, setState] = useState({ name: '' });
+//   useEffect(() => {
+//     console.log('out effect', state);
+//   });
+//   const onChange = (val) => {
+//     console.log('onChange', val);
+//   };
+//   const inputChange = (val) => {
+//     console.log('input onChange', val);
+//   };
+
+//   const onClick = (e) => {
+//     setState({ name: +new Date() });
+//     // db.onChange({ name: +new Date() });
+//   };
+
+//   const onSubmit = () => {
+//     // console.log('state', state);
+//     console.log('db', db.value);
+//   };
+
+//   const onEffect = (v) => {
+//     console.log('onEffect', v);
+//   };
+
+//   return (
+//     <div>
+//       <Space with={db} effect={onEffect}>
+//         <Input vm="name" onChange={inputChange} />
+//       </Space>
+//       <button type="button" onClick={onClick}>clickme</button>
+//       <button type="button" onClick={onSubmit}>submit</button>
+//     </div>
+//   );
+// };
+export default App;
+// export default HooksApp;

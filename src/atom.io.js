@@ -43,28 +43,23 @@ const vn = {
 
 class AtomicBox extends PureComponent {
   state = {
-    store: {}, // eslint-disable-line
-    put: () => {}, // eslint-disable-line
+    store: {},
+    put: this.put,
+  }
+
+  put = (...args) => {
+    this.setState(produce(...args));
   };
 
   componentWillUnmount() {
-    const { _id } = this.props;
-    vn.gots[_id] = undefined;
-    vn.puts[_id] = undefined;
-  }
-
-  static getDerivedStateFromProps(props) {
-    const { ctx, _id } = props;
-    const { state: store, setState } = ctx;
-    const put = setState.bind(ctx);
-    vn.gots[_id] = store;
-    vn.puts[_id] = producer => put(produce(store, producer));
-    return { store, put };
+    this.props.onUnmount();
   }
 
   render() {
-    const { children } = this.props;
-    // const { store, put } = this.state;
+    const { children, getGot, getPut } = this.props;
+    const { store, put } = this.state;
+    getGot(store);
+    getPut(put);
     return (
       <AtomicCtx.Provider value={this.state}>
         {children}
@@ -73,10 +68,13 @@ class AtomicBox extends PureComponent {
   }
 }
 
-let atomId = 233;
+// let atomId = 233;
 
 const atom = () => {
-  const id = `AtomicBox${atomId++}`; // eslint-disable-line
+  // const id = `AtomicBox${atomId++}`; // eslint-disable-line
+  const closure = {
+
+  };
   const Atomic = props => <AtomicBox {...props} _id={id} />;
   const got = () => vn.getGot(id);
   const put = (producer, waiting = 0) => new Promise((resolve) => {
@@ -254,3 +252,5 @@ export {
   atom,
   AtomIt,
 };
+
+export default atom;
