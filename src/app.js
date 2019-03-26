@@ -1,5 +1,5 @@
 import React, { PureComponent, useState, useEffect } from 'react';
-import { Space, Atomic } from './space';
+import { Space, Atomic, ruler } from './space';
 
 const Input = Atomic((props) => {
   const onChange = (e) => {
@@ -7,8 +7,7 @@ const Input = Atomic((props) => {
   };
   return <input type="text" {...props} onChange={onChange} />;
 });
-const Show = Atomic(props => props.value || '');
-
+const Show = Atomic(props => <pre>{JSON.stringify(props, null, 2)}</pre>);
 
 const db = {
   value: { name: '2333' },
@@ -17,6 +16,8 @@ const db = {
   },
 };
 
+const theRuler = ruler();
+const number = v => (/\d+$/.test(v) ? null : '只能输入数字');
 
 class App extends PureComponent {
   // state = {
@@ -27,11 +28,20 @@ class App extends PureComponent {
     console.log('onChange', val);
   }
 
-  onClick = (e) => {
-    // window.get = () => this.state;
-    this.setState({ name: +new Date() });
-    // db.onChange({ name: +new Date() });
+  onClickReset = (e) => {
+    theRuler.reset();
   }
+
+  onClickRule = (e) => {
+    theRuler.rule().then((result) => {
+      console.log('rule', result);
+    });
+  }
+
+  onClickReRule = (e) => {
+    theRuler.rerule();
+  }
+
 
   // diff = (nextState) => {
   //   console.log('next', nextState, this.state);
@@ -48,15 +58,17 @@ class App extends PureComponent {
   render() {
     return (
       <div>
-        <Space with={this} effect={this.onEffect}>
+        <Space with={this} effect={this.onEffect} ruler={theRuler}>
           <div>
-            <Input vm="name" onChange={this.onChange} />
+            <Input vm="name" onChange={this.onChange} rules={[number]} />
           </div>
           <div>
-            <Show vm="name" />
+            <Show vm="name" rules={[number]} />
           </div>
         </Space>
-        <button type="button" onClick={this.onClick}>clickme</button>
+        <button type="button" onClick={this.onClickReset}>reset</button>
+        <button type="button" onClick={this.onClickReRule}>rerule</button>
+        <button type="button" onClick={this.onClickRule}>rule</button>
       </div>
     );
   }

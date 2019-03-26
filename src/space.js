@@ -23,10 +23,17 @@ const usePrevious = (value) => {
 };
 
 const noop = () => {};
+const theRuler = (v, rules) => rules.reduce((result, rule) => {
+  if (result) return result;
+  return rule(v);
+}, null);
+
+theRuler.WAITING = '校验中...';
+theRuler.HTTPFIELD = '校验失败';
 
 const Space = (props) => {
   const {
-    with: ctx, state, setState, value, onChange, effect, children,
+    with: ctx, state, setState, value, onChange, effect, children, ruler,
   } = props;
 
   const val = (ctx && ctx[0]) || (ctx && ctx.state) || (ctx && ctx.value)
@@ -40,12 +47,35 @@ const Space = (props) => {
   }
 
   const [store, putStore] = useState(val);
+  /**
+   * rulesMap
+   *  [path]: {
+   *    rules: [],
+   *    result: null,
+   *  }
+   */
+  const [ruleMap, putRule] = useState({});
   const prevStore = usePrevious(store);
   const prevV = usePrevious(val);
   const put = (next) => {
     change(next);
     putStore(next);
   };
+
+  if (ruler && !ruler.getMap) {
+    // I used rule the world.
+    ruler.getMap = () => ruleMap;
+    ruler.putRule = putRule;
+    ruler.rerule = () => {
+      putRule(produce(ruleMap, (map) => {
+        Object.keys(map).map().forEach((path) => {
+          const v = _.get(store, JSON.parse(path));
+          const { rules } = map[path];
+          map[path].result = theRuler(v, rules);
+        });
+      }));
+    };
+  }
 
   useEffect(() => {
     // 外部更新
@@ -63,12 +93,14 @@ const Space = (props) => {
     if (!shallowequal(prevStore, store) && prevStore) {
       effect(store);
     }
-  }, [val, store]);
+  }, [val, store, ruleMap]);
 
   return (
     <SpaceCtx.Provider value={{
       store,
       put,
+      ruleMap: ruler ? ruleMap : false,
+      putRule: ruler ? putRule : false,
     }}
     >
       {children}
@@ -84,14 +116,21 @@ const Atomic = (Comp) => {
     lastChange = '__INIT__';
 
     renderComp = (ctx) => {
-      const { store, put } = ctx;
       const {
-        vm, forwardRef: ref, input, output, onChange = noop,
+        store, put, ruleMap, putRule,
+      } = ctx;
+      const {
+        vm, forwardRef: ref, input, output, onChange = noop, rules,
       } = this.props;
+
+      this.ruleMap = ruleMap;
+      this.putRule = putRule;
+
       const inputPipes = handleInput(input);
       const outputPipes = handleOutput(output);
 
       const path = _castPath(vm);
+      const vmStr = JSON.stringify(vm);
       const value = inputPipes.reduce((v, pipe) => pipe(v), _.get(store, path));
 
       let change;
@@ -112,10 +151,17 @@ const Atomic = (Comp) => {
             onChange(next);
             this.lastChange = after;
           }
+          if (ruleMap && rules) {
+            const wali = theRuler(after, rules);
+            putRule(produce((map) => {
+              _.set(map, [vmStr, 'result'], wali);
+              _.set(map, [vmStr, 'rules'], rules);
+            }));
+          }
         };
       }
       if (!shallowequal(this.lastChange, value)) {
-        if (this.lastChange !== '__INIT__') {
+        if (change && this.lastChange !== '__INIT__') {
           change(value);
         }
         this.lastChange = value;
@@ -127,6 +173,9 @@ const Atomic = (Comp) => {
         value,
         onChange: change,
       };
+      if (ruleMap && ruleMap[vmStr] && ruleMap[vmStr].result) {
+        nextProps.wali = ruleMap[vmStr].result;
+      }
       delete nextProps.forwardRef;
 
       return (
@@ -147,8 +196,43 @@ const Atomic = (Comp) => {
   return ForwardAtomicBox;
 };
 
+const ruler = () => ({
+  getMap: null,
+  putRule: null,
+  rerule: null,
+  rule(path) {
+    const { getMap } = this;
+    let result;
+    if (path) {
+      result = getMap()[path].result; // eslint-disable-line
+    }
+    const map = getMap();
+    const hasPath = Object.keys(map).find(p => map[p].result);
+    result = hasPath ? map[hasPath].result : hasPath;
+    return result ? Promise.reject(result) : Promise.resolve();
+  },
+  reset(path) {
+    const { putRule, getMap } = this;
+    const ruleMap = getMap();
+    if (path) {
+      putRule(produce(ruleMap, (map) => {
+        map[path].result = null;
+      }));
+    } else {
+      putRule(produce(ruleMap, (map) => {
+        Object.entries(map).forEach((rule) => {
+          rule.result = null;
+        });
+      }));
+    }
+  },
+});
+
+ruler.WAITING = theRuler.WAITING;
+ruler.HTTPFIELD = theRuler.HTTPFIELD;
 
 export {
   Space,
   Atomic,
+  ruler,
 };
