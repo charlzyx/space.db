@@ -5,7 +5,7 @@ env:
   browser: true
 parser: babel-eslint
 rules:
-  no-nested-ternary: 1
+  no-nested-ternary: 0
   linebreak-style: 0
   no-param-reassign: 0
   react/prefer-stateless-function: 0
