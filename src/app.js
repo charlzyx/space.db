@@ -1,13 +1,18 @@
 import React, { PureComponent, useState, useEffect } from 'react';
+import { stringify } from 'stringify-parse';
 import { Space, Atomic, ruler } from './space';
 
 const Input = Atomic((props) => {
   const onChange = (e) => {
     props.onChange(e.target.value);
   };
-  return <input type="text" {...props} onChange={onChange} />;
+  return (
+    <div>
+      <input type="text" {...props} onChange={onChange} />
+      <pre>{JSON.stringify(props, null, 2)}</pre>
+    </div>
+  );
 });
-const Show = Atomic(props => <pre>{JSON.stringify(props, null, 2)}</pre>);
 
 const db = {
   value: { name: '2333' },
@@ -18,6 +23,14 @@ const db = {
 
 const theRuler = ruler();
 const number = v => (/\d+$/.test(v) ? null : '只能输入数字');
+const http = () => new Promise((resolve, reject) => {
+  setTimeout(() => {
+    if (Math.random() > 0.3) {
+      resolve();
+    }
+    reject('http wali failed');
+  }, 1000);
+});
 
 class App extends PureComponent {
   // state = {
@@ -28,18 +41,24 @@ class App extends PureComponent {
     console.log('onChange', val);
   }
 
-  onClickReset = (e) => {
+  onClickReset = () => {
     theRuler.reset();
   }
 
-  onClickRule = (e) => {
-    theRuler.rule().then((result) => {
-      console.log('rule', result);
+  onClickRule = () => {
+    theRuler.rule().then(() => {
+      console.log('rule pass');
+    }).catch((reason) => {
+      console.error('rule failed, reason:', reason);
     });
   }
 
-  onClickReRule = (e) => {
-    theRuler.rerule();
+  onClickReRule = () => {
+    theRuler.ruling().then(() => {
+      console.log('ruling pass');
+    }).catch((reasons) => {
+      console.log('ruling failed reasons', reasons);
+    });
   }
 
 
@@ -60,10 +79,7 @@ class App extends PureComponent {
       <div>
         <Space with={this} effect={this.onEffect} ruler={theRuler}>
           <div>
-            <Input vm="name" onChange={this.onChange} rules={[number]} />
-          </div>
-          <div>
-            <Show vm="name" rules={[number]} />
+            <Input vm="name" onChange={this.onChange} rules={[number, http]} />
           </div>
         </Space>
         <button type="button" onClick={this.onClickReset}>reset</button>

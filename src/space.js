@@ -10,6 +10,7 @@ import _castPath from 'lodash/_castPath';
 
 
 const isType = (o, t) => Object.prototype.toString.call(o) === `[object ${t}]`;
+const isThenable = p => (typeof p.then === 'function');
 
 const SpaceCtx = createContext({});
 
@@ -23,17 +24,27 @@ const usePrevious = (value) => {
 };
 
 const noop = () => {};
-const theRuler = (v, rules) => rules.reduce((result, rule) => {
-  if (result) return result;
+
+// 裁决刃.国肠
+const ruling = (v, rules) => rules.reduce((reason, rule) => {
+  if (reason) return reason;
   return rule(v);
 }, null);
 
-theRuler.WAITING = '校验中...';
-theRuler.HTTPFIELD = '校验失败';
+ruling.WAITING = '校验中...';
 
 const Space = (props) => {
   const {
-    with: ctx, state, setState, value, onChange, effect, children, ruler,
+    // 成吨的语法糖
+    with: ctx, state, setState, value, onChange,
+    // 副作用
+    effect,
+    // jack son
+    children,
+    // 校验 refer
+    ruler,
+    // got / put refer
+    disover,
   } = props;
 
   const val = (ctx && ctx[0]) || (ctx && ctx.state) || (ctx && ctx.value)
@@ -48,13 +59,13 @@ const Space = (props) => {
 
   const [store, putStore] = useState(val);
   /**
-   * rulesMap
-   *  [path]: {
-   *    rules: [],
-   *    result: null,
-   *  }
+   * rules
+   * { path: [path] ,
+   *   rules: [],
+   *   reason: null | msg | true ,
+   * }
    */
-  const [ruleMap, putRule] = useState({});
+  const [rules, putRule] = useState([]);
   const prevStore = usePrevious(store);
   const prevV = usePrevious(val);
   const put = (next) => {
@@ -63,17 +74,131 @@ const Space = (props) => {
   };
 
   if (ruler && !ruler.getMap) {
-    // I used rule the world.
-    ruler.getMap = () => ruleMap;
+    /**
+     * I used rule the world.
+     *    -- Viva La Vida.
+     *
+     * 1789年7月14日,法国国王路易十六在日记中写下“今日无事”。
+     */
+    ruler.getRules = () => rules;
     ruler.putRule = putRule;
-    ruler.rerule = () => {
-      putRule(produce(ruleMap, (map) => {
-        Object.keys(map).map().forEach((path) => {
-          const v = _.get(store, JSON.parse(path));
-          const { rules } = map[path];
-          map[path].result = theRuler(v, rules);
+    ruler.ruling = (path) => {
+      const castPath = _castPath(path);
+      if (path) {
+        const rule = rules.find(r => shallowequal(r.path, castPath));
+        return new Promise((resolve, reject) => {
+          try {
+            const reason = ruling(_.get(store, path), rule.rules);
+            // 所以同步就是省心啊
+            if (!isThenable(reason)) {
+              putRule(produce((all) => {
+                const myRule = all.find(r => shallowequal(r.path, castPath));
+                myRule.reason = reason;
+              }));
+              if (reason) {
+                reject(reason);
+              } else {
+                resolve();
+              }
+            } else {
+              // 难受的异步
+              // 先更新下UI
+              putRule(produce((all) => {
+                const myRule = all.find(r => shallowequal(r.path, castPath));
+                myRule.reason = ruling.WAITING;
+              }));
+              // 异步 fq
+              reason.then((nextReason) => {
+                putRule(produce((all) => {
+                  const myRule = all.find(r => shallowequal(r.path, castPath));
+                  // 被外部手动取消了
+                  if (myRule.reason === null) {
+                    resolve();
+                    return;
+                  }
+                  myRule.reason = nextReason;
+                  if (nextReason) {
+                    reject(nextReason);
+                  } else {
+                    resolve();
+                  }
+                }));
+              }).catch((e) => {
+                putRule(produce((all) => {
+                  const myRule = all.find(r => shallowequal(r.path, castPath));
+                  // 被外部手动取消了
+                  if (myRule.reason === null) {
+                    resolve();
+                    return;
+                  }
+                  myRule.reason = e || 'RULING_HTTP_ERROR';
+                  reject(myRule.reason);
+                }));
+              });
+            }
+          } catch (error) {
+            console.error(error);
+            reject(error);
+          }
         });
-      }));
+      }
+
+      // 还有比异步更恶心的玩意吗? 当然, 循环异步
+      return Promise.all(rules.map(rule => new Promise((resolve, reject) => {
+        try {
+          const reason = ruling(_.get(store, rule.path), rule.rules);
+          // 所以同步就是省心啊
+          if (!isThenable(reason)) {
+            putRule(produce((all) => {
+              const myRule = all.find(r => shallowequal(r.path, rule.path));
+              myRule.reason = reason;
+            }));
+            if (reason) {
+              reject(reason);
+            } else {
+              resolve();
+            }
+          } else {
+            // 难受的异步
+            // 先更新下UI
+            putRule(produce((all) => {
+              const myRule = all.find(r => shallowequal(r.path, rule.path));
+              myRule.reason = ruling.WAITING;
+            }));
+            // 异步 fq
+            reason.then((nextReason) => {
+              putRule(produce((all) => {
+                const myRule = all.find(r => shallowequal(r.path, rule.path));
+                // 被外部手动取消了
+                if (myRule.reason === null) {
+                  resolve();
+                  return;
+                }
+                myRule.reason = nextReason;
+                if (nextReason) {
+                  reject(nextReason);
+                } else {
+                  resolve();
+                }
+              }));
+            }).catch((e) => {
+              putRule(produce((all) => {
+                const myRule = all.find(r => shallowequal(r.path, rule.path));
+                // 被外部手动取消了
+                if (myRule.reason === null) {
+                  resolve();
+                  return;
+                }
+                myRule.reason = e || 'RULING_HTTP_ERROR';
+                reject(myRule.reason);
+              }));
+            });
+          }
+        } catch (error) {
+          console.error(error);
+          reject(error);
+        }
+      })));
     };
   }
 
@@ -93,13 +218,13 @@ const Space = (props) => {
     if (!shallowequal(prevStore, store) && prevStore) {
       effect(store);
     }
-  }, [val, store, ruleMap]);
+  }, [val, store, rules]);
 
   return (
     <SpaceCtx.Provider value={{
       store,
       put,
-      ruleMap: ruler ? ruleMap : false,
+      rules: ruler ? rules : false,
       putRule: ruler ? putRule : false,
     }}
     >
@@ -117,20 +242,16 @@ const Atomic = (Comp) => {
 
     renderComp = (ctx) => {
       const {
-        store, put, ruleMap, putRule,
+        store, put, rules: allRules, putRule,
       } = ctx;
       const {
         vm, forwardRef: ref, input, output, onChange = noop, rules,
       } = this.props;
 
-      this.ruleMap = ruleMap;
-      this.putRule = putRule;
-
       const inputPipes = handleInput(input);
       const outputPipes = handleOutput(output);
 
       const path = _castPath(vm);
-      const vmStr = JSON.stringify(vm);
       const value = inputPipes.reduce((v, pipe) => pipe(v), _.get(store, path));
 
       let change;
@@ -151,11 +272,36 @@ const Atomic = (Comp) => {
             onChange(next);
             this.lastChange = after;
           }
-          if (ruleMap && rules) {
-            const wali = theRuler(after, rules);
-            putRule(produce((map) => {
-              _.set(map, [vmStr, 'result'], wali);
-              _.set(map, [vmStr, 'rules'], rules);
+          if (allRules && rules) {
+            let wali = ruling(after, rules);
+            if (isThenable(wali)) {
+              wali.then((nextWali) => {
+                putRule(produce((all) => {
+                  const myRule = all.find(rule => shallowequal(rule.path, path));
+                  // 表明是被重置掉了, 就不在管了
+                  if (!myRule.reason === null) return;
+                  myRule.rules = rules;
+                  myRule.reason = nextWali;
+                }));
+              }).catch((e) => {
+                putRule(produce((all) => {
+                  const myRule = all.find(rule => shallowequal(rule.path, path));
+                  // 表明是被重置掉了, 就不在管了
+                  if (!myRule.reason === null) return;
+                  myRule.rules = rules;
+                  myRule.reason = e || 'RULING_HTTP_FAILED';
+                }));
+              });
+              wali = ruling.WAITING;
+            }
+            putRule(produce((all) => {
+              const myRule = all.find(rule => shallowequal(rule.path, path));
+              if (myRule) {
+                myRule.rules = rules;
+                myRule.reason = wali;
+              } else {
+                all.push({ rules, reason: wali, path });
+              }
             }));
           }
         };
@@ -173,8 +319,9 @@ const Atomic = (Comp) => {
         value,
         onChange: change,
       };
-      if (ruleMap && ruleMap[vmStr] && ruleMap[vmStr].result) {
-        nextProps.wali = ruleMap[vmStr].result;
+      const has = allRules.find(rule => shallowequal(rule.path, path));
+      if (has) {
+        nextProps.wali = has.reason;
       }
       delete nextProps.forwardRef;
 
@@ -197,39 +344,44 @@ const Atomic = (Comp) => {
 };
 
 const ruler = () => ({
-  getMap: null,
+  getRules: null,
   putRule: null,
-  rerule: null,
+  ruling: null,
   rule(path) {
-    const { getMap } = this;
-    let result;
+    const { getRules } = this;
+    const rules = getRules();
+    let reason;
     if (path) {
-      result = getMap()[path].result; // eslint-disable-line
+      reason = rules.find(rule => shallowequal(rule.path, _castPath(path)));
     }
-    const map = getMap();
-    const hasPath = Object.keys(map).find(p => map[p].result);
-    result = hasPath ? map[hasPath].result : hasPath;
-    return result ? Promise.reject(result) : Promise.resolve();
+    const has = rules.find(rule => rule.reason !== null);
+    reason = has ? has.reason : has;
+    return reason ? Promise.reject(reason) : Promise.resolve();
   },
   reset(path) {
-    const { putRule, getMap } = this;
-    const ruleMap = getMap();
+    const { putRule, getRules } = this;
+    const rules = getRules();
     if (path) {
-      putRule(produce(ruleMap, (map) => {
-        map[path].result = null;
+      putRule(produce(rules, (rs) => { // eslint-disable-line
+        for (let i = 0; i <= rules.length; i++) { // eslint-disable-line
+          const rule = rules[i];
+          if (shallowequal(rule.path, _castPath(path))) {
+            rule.reason = null;
+            return rs;
+          }
+        }
       }));
     } else {
-      putRule(produce(ruleMap, (map) => {
-        Object.entries(map).forEach((rule) => {
-          rule.result = null;
+      putRule(produce(rules, (rs) => {
+        rs.forEach((rule) => {
+          rule.reason = null;
         });
       }));
     }
   },
 });
 
-ruler.WAITING = theRuler.WAITING;
-ruler.HTTPFIELD = theRuler.HTTPFIELD;
+ruler.WAITING = ruling.WAITING;
 
 export {
   Space,
