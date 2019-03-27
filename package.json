@@ -1,9 +1,9 @@
 {
-  "name": "atom.io",
-  "version": "0.0.0",
+  "name": "space.db",
+  "version": "0.1.2.3",
   "description": "Atomic Input/OnChange Component, for react, powered by immer.js.",
-  "homepage": "https://github.com/charlzyx/atom.io",
-  "repository": "git@github.com:charlzyx/atom.io.git",
+  "homepage": "https://github.com/charlzyx/space.db",
+  "repository": "git@github.com:charlzyx/space.db.git",
   "main": "index.js",
   "scripts": {
     "start": "webpack-dev-server --config ./webpack.config.js --mode development"

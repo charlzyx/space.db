@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 /**
- * Space.db
+ * space.db
  *
  * [Space] 仰望星空 | https://www.nasa.gov
  * [Space] 与脚踏实地, 看看键盘上最大的是什么键 | http://spacemacs.org
@@ -393,10 +393,10 @@ const Space = (props) => {
      * 内部 store 更新触发的外部更新
      * 如果 props.value 没有变化, 但是 store 跟 props.value 不再相等, 触发change
      */
-    if (shallowequal(prevV, val) && !shallowequal(val, store)) {
-      console.log('inner change');
-      change(store);
-    }
+    // if (shallowequal(prevV, val) && !shallowequal(val, store)) {
+    //   console.log('inner change');
+    //   change(store);
+    // }
     /**
      * store 有变化, effect
      */
