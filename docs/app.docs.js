@@ -2,7 +2,7 @@ import React, { PureComponent, useState, useEffect } from 'react';
 import { stringify } from 'stringify-parse';
 import {
   Space, Atomic, ruler, discover,
-} from './space';
+} from '../src/space.db';
 
 const Input = Atomic((props) => {
   const onChange = (e) => {

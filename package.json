@@ -1,20 +1,24 @@
 {
   "name": "space.db",
   "version": "0.2.3",
-  "description": "Atomic Input/OnChange Component, for react, powered by immer.js.",
+  "description": "Two-Way Space/DataBinding, for React. powered by createContext, hooks and immer.js.",
   "homepage": "https://github.com/charlzyx/space.db",
   "repository": "git@github.com:charlzyx/space.db.git",
-  "main": "space.js",
+  "main": "space.db.js",
   "scripts": {
-    "start": "webpack-dev-server --config ./webpack.config.js --mode development"
+    "start": "webpack-dev-server --config ./webpack.examples.config.js --mode development",
+    "build": "todo",
+    "doc": "todo"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@babel/core": "^7.3.4",
     "@babel/plugin-proposal-class-properties": "^7.3.4",
-    "@babel/preset-env": "^7.3.4",
+    "@babel/plugin-proposal-object-rest-spread": "^7.4.0",
+    "@babel/preset-env": "^7.4.2",
     "@babel/preset-react": "^7.0.0",
+    "@mdx-js/loader": "^0.20.3",
     "babel-eslint": "^10.0.1",
     "babel-loader": "^8.0.5",
     "babel-plugin-import": "^1.11.0",
@@ -37,16 +41,22 @@
     "webpack-dev-server": "^3.2.1"
   },
   "dependencies": {
+    "@mdx-js/tag": "^0.20.3",
     "hoist-non-react-statics": "^3.3.0",
     "immer": "^2.1.3",
     "is-primitive": "^3.0.1",
     "lodash": "^4.17.11",
+    "mdx": "^0.3.1",
     "ppph": "^1.2.1",
+    "prism-react-renderer": "^0.1.6",
     "prop-types": "^15.7.2",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",
+    "react-live": "^2.0.0",
+    "rxjs": "^6.4.0",
     "shallowequal": "^1.1.0",
     "stringify-parse": "^1.0.6",
+    "unified-ui": "^0.0.3",
     "use-immer": "^0.1.0"
   }
 }

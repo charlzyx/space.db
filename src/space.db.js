@@ -1,10 +1,9 @@
 /* eslint-disable react/prop-types */
 /**
  * space.db
- *
- * [Space] 仰望星空 | https://www.nasa.gov
- * [Space] 与脚踏实地, 看看键盘上最大的是什么键 | http://spacemacs.org
- * [Space] namespace | 数据模块化的一种视觉暗示
+ * - https://www.nasa.gov
+ * - http://spacemacs.org
+ * - namespace
  */
 import React, {
   PureComponent, createContext, forwardRef, useState, useEffect, useRef,
@@ -14,6 +13,7 @@ import produce from 'immer';
 import shallowequal from 'shallowequal';
 import _ from 'lodash';
 import _castPath from 'lodash/_castPath';
+import flush from './flush';
 
 /**
  * 判断给定值是否是给定类型;
@@ -114,7 +114,7 @@ const Space = (props) => {
     // 成吨的语法糖
     with: ctx, state, setState, value, onChange,
     // 副作用
-    effect,
+    effect = noop,
     // 校验 refer
     ruler,
     // got / put refer
@@ -419,47 +419,7 @@ const Space = (props) => {
 };
 
 /**
- * io 管道语法糖处理
- * ------------------------------------------------------------
- * - handleInput
- *  (input, io) = InputPipe[]
- * - handleOutput
- *  (output, io) => OutputPipe[]
- */
-const handleInput = (input, io) => (io ? io.map(pair => pair[0])
-  : (input ? (Array.isArray(input) ? input : [input]) : []));
-const handleOutput = (output, io) => (io ? io.map(pair => pair[1])
-  : (output ? (Array.isArray(output) ? output : [output]) : []));
-
-/**
  * Atomic 原子组件:
- * 如果一个组件像下方这个 Input 这样, 拥有 value/onChange 属性,
- * 并且 onChange 只对 value 做了set, 那么, 我们称之为 [原子组件]
- *
- * const Input = (props) => <input
-  *  {...props}
-  *  onChange=(e) => {
-  *    props.onChange(e.target.value);
-  *  }
-  * />
- * ------------------------------------------------------------
- * - vm 像 vue v-model 一样的语法, 表示在当前 store 中的路径
- *  stirng | path[] // 参考 lodash 所支持的 path 格式
- * --------------
- * - v 跟 vm 类似, 不同的是, 会被认为是没有 onChange 的只读类型
- *  stirng | path[] // 参考 lodash 所支持的 path 格式
- * --------------
- * - io 成对出现的 [input, output] 过滤器, 考虑到成对出现的特性,提出来的语法糖
- *  [input, output][]
- * --------------
- * - input 对获取到的 value 的处理管道函数
- *  (v) => next
- * --------------
- * - output 对 onChange 的参数 next 的处理管道函数
- *  (next) => nextnext
- * --------------
- * - onChange 事实上, 就只是 onEffect 的作用了, 只是监听了变动, 不期望在此处做修改
- *  (next) => void
  * --------------
  * - rules 校验规则集, 数组, 函数
  *  (v) => null | reason | Promise<null | reason>[]
@@ -468,111 +428,122 @@ const handleOutput = (output, io) => (io ? io.map(pair => pair[1])
  */
 const Atomic = (Comp) => {
   class AtomicBox extends PureComponent {
-    lastChange = '__INIT__';
+    old = '__INIT__';
+
+    awaiting = false;
+
+    pid = Number.MIN_SAFE_INTEGER;
 
     renderComp = (ctx) => {
       const {
         store, put, rules: allRules, putRule,
       } = ctx;
+      /**
+       * TODO: 目前只做了单个 input/output, 还没测, 等一个测试和 forEach
+       */
       const {
-        vm, v: readonlyPath, forwardRef: ref, input, output, onChange = noop, rules, io,
+        input,
+        output,
+        effect,
+        rules,
+        forwardRef: ref,
       } = this.props;
+      const inputs = input.map(i => i);
+      const outputs = output.map(i => i);
+
+      const path = inputs.splice(0, 1);
+      const to = inputs.splice(-1, 1);
 
       /**
-       * io 管道处理
-       */
-      const inputPipes = handleInput(input, io);
-      const outputPipes = handleOutput(output, io);
+      * flush input
+      * ---------------------------------------
+      */
+      const now = flush(inputs, _.get(store, path));
+      const event = outputs.splice(0, 1);
+      const effects = effect[0];
 
       /**
-       * path 处理
+       * flush output
+       * ---------------------------------------
        */
-      const path = _castPath(vm || readonlyPath);
-      /**
-       * 使用 input 管道们, 对值做处理
-       */
-      const value = inputPipes.reduce((v, pipe) => pipe(v), _.get(store, path));
-
-      /**
-       * 有 vm 才有 change, 否则就是只读
-       */
-      let change;
-      if (vm) {
-        change = (v) => {
-          const after = outputPipes.reduce((nv, pipe) => pipe(nv), v);
-          let next;
-          try {
-            next = produce(store, (draftStore) => { // eslint-disable-line
-              _.set(draftStore, path, after);
-            });
-          } catch (error) {
-            console.error('[Space] set immer produce error\n', error);
-            next = _.cloneDeep(store);
-            _.set(next, path, after);
-          } finally {
-            // 调用 putStore 并触发自己的 onChange
-            put(next);
-            onChange(next);
-            this.lastChange = after;
-          }
-          // 漫长并略微复杂的校验处理
-          if (allRules && rules) {
-            let wali = ruling(after, rules);
-            // 我上面说过什么来着, 异步就是难受
-            if (isThenable(wali)) {
-              wali.then((nextWali) => {
-                putRule(produce((all) => {
-                  const myRule = all.find(rule => shallowequal(rule.path, path));
-                  // 表明是被重置掉了, 就不在管了
-                  if (!myRule.reason === null) return;
-                  myRule.rules = rules;
-                  myRule.reason = nextWali;
-                }));
-              }).catch((e) => {
-                putRule(produce((all) => {
-                  const myRule = all.find(rule => shallowequal(rule.path, path));
-                  // 表明是被重置掉了, 就不在管了
-                  if (!myRule.reason === null) return;
-                  myRule.rules = rules;
-                  myRule.reason = e || 'RULING_HTTP_FAILED';
-                }));
-              });
-              wali = ruling.WAITING;
+      if (!this.awaiting && output) {
+        this.awaiting = true;
+        this.change = (next) => {
+          this.pid ++; // eslint-disable-line
+          const { pid } = this;
+          flush.async(outputs, next).then((after) => {
+            // 来晚啦, 小老弟, 后来居上!
+            if (pid < this.pid) {
+              this.awaiting = false;
+              return;
             }
-            // 同步
-            putRule(produce((all) => {
-              const myRule = all.find(rule => shallowequal(rule.path, path));
-              if (myRule) {
-                myRule.rules = rules;
-                myRule.reason = wali;
-              } else {
-                all.push({ rules, reason: wali, path });
-              }
+            put(produce((draft) => {
+              _.set(draft, path, after);
             }));
-          }
+            // 放到下一个队列中, 差不多等到下次刷新
+            setTimeout(() => {
+              this.awaiting = false;
+            });
+            if (allRules && rules) {
+              let reason = ruling(after, rules);
+              // 我上面说过什么来着, 异步就是难受
+              if (isThenable(reason)) {
+                reason.then((nextReason) => {
+                  putRule(produce((all) => {
+                    const myRule = all.find(rule => shallowequal(rule.path, path));
+                    // 表明是被重置掉了, 就不在管了
+                    if (!myRule.reason === null) return;
+                    myRule.rules = rules;
+                    myRule.reason = nextReason;
+                  }));
+                }).catch((e) => {
+                  putRule(produce((all) => {
+                    const myRule = all.find(rule => shallowequal(rule.path, path));
+                    // 表明是被重置掉了, 就不在管了
+                    if (!myRule.reason === null) return;
+                    myRule.rules = rules;
+                    myRule.reason = e || 'RULING_HTTP_FAILED';
+                  }));
+                });
+                reason = ruling.WAITING;
+              }
+              // 同步
+              putRule(produce((all) => {
+                const myRule = all.find(rule => shallowequal(rule.path, path));
+                if (myRule) {
+                  myRule.rules = rules;
+                  myRule.reason = reason;
+                } else {
+                  all.push({ rules, reason, path });
+                }
+              }));
+            }
+          }).catch((reason) => {
+            console.error(reason);
+            this.awaiting = false;
+          });
         };
       }
-      // 如果是 外部 的setState或者discover.put 触发的change, 这里也要判断出来, 并触发
-      if (vm && !shallowequal(this.lastChange, value)) {
-        if (change && this.lastChange !== '__INIT__') {
-          change(value);
-        }
-        this.lastChange = value;
-      }
+
 
       const nextProps = {
         ...this.props,
         ref,
-        value,
+        [to]: now,
+        [event]: this.change || noop,
+        awaiting: this.awaiting,
       };
-      // 只读就是在这里做的
-      if (vm) {
-        nextProps.onChange = change;
-      }
       // 在某次 rules 变更触发的更新中, 查询自己的 reason
-      const has = vm && allRules && allRules.find(rule => shallowequal(rule.path, path));
+      const has = path && allRules && allRules.find(rule => shallowequal(rule.path, path));
       if (has) {
-        nextProps.wali = has.reason;
+        nextProps.reason = has.reason;
+      }
+
+      if (!shallowequal(this.old, now)) {
+        if (this.old !== '__INIT__') {
+          effects(now);
+        }
+        this.old = now;
       }
 
       return (

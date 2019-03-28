@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import MdxCode from './mdxcode';
 // import ppph, { piper } from 'ppph';
 import App from './app';
 // import { AtomIt } from './atom.io';
@@ -27,7 +28,9 @@ import App from './app';
 // ppph.inject();
 
 ReactDOM.render(
-  <App />,
+  <MdxCode>
+    <App />
+  </MdxCode>,
   document.getElementById('app'),
 );
 

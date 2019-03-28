@@ -2,7 +2,7 @@ const webpack = require('webpack');
 const path = require('path');
 
 module.exports = {
-  entry: './src/index.js',
+  entry: './examples/index.js',
   module: {
     rules: [
       {
@@ -14,6 +14,13 @@ module.exports = {
         test: /\.js$/,
         exclude: /node_modules/,
         use: ['eslint-loader'],
+      },
+      {
+        test: /.mdx?$/,
+        use: [
+          'babel-loader',
+          '@mdx-js/loader',
+        ],
       },
       {
         test: /\.(less|css)$/,
@@ -28,10 +35,13 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: ['*', '.js', '.jsx']
+    extensions: ['*', '.js', '.jsx'],
+    alias: {
+      'space.db': path.resolve(__dirname, 'src/space.db.js'),
+    },
   },
   output: {
-    path: `${__dirname}/dist`,
+    path: `${__dirname}/examples/dist`,
     publicPath: '/',
     filename: 'bundle.js',
   },
@@ -40,7 +50,7 @@ module.exports = {
   ],
   devtool: 'eval-source-map',
   devServer: {
-    contentBase: './dist',
+    contentBase: './examples/dist',
     hot: true,
   },
 };
